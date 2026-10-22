@@ -9,7 +9,6 @@ import {
   PenLine, 
   X, 
   ArrowRight,
-  ArrowLeft,
   Layers,
   Home,
   GraduationCap,
