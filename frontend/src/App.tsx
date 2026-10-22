@@ -11,7 +11,6 @@ import {
   X, 
   Sparkles, 
   BookOpenCheck,
-  Compass,
   ArrowRight,
   Layers,
   Home,
@@ -23,13 +22,11 @@ import {
   LogIn,
   LogOut,
   Lock,
+  Mail,
+  KeyRound,
   ShieldCheck,
-  BookOpen,
-  Sparkle
+  BookOpen
 } from 'lucide-react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider, signInWithPopup, signOut } from './firebase.ts';
 import type { Lesson, CourseLevel, WatchProgress } from './types';
 import { 
   ACHIEVEMENTS_LIST, 
@@ -39,102 +36,130 @@ import {
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
-// Componente da Tela de Login / Bloqueio de Acesso
-function LoginScreen({ onLogin, onBackHome }: { onLogin: () => void; onBackHome: () => void }) {
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+interface LocalUser {
+  email: string;
+  name: string;
+}
 
-  const handleAction = async () => {
-    setIsLoggingIn(true);
-    try {
-      await onLogin();
-    } finally {
-      setIsLoggingIn(false);
+// Ecrã de Login & Registo sem dependência de APIs externas
+function SimpleLoginScreen({ 
+  onLoginSuccess, 
+  onBackHome 
+}: { 
+  onLoginSuccess: (email: string) => void; 
+  onBackHome: () => void; 
+}) {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!email.includes('@') || !email.includes('.')) {
+      setError('Por favor, introduza um e-mail válido.');
+      return;
     }
+
+    if (password.length < 4) {
+      setError('A palavra-passe deve ter pelo menos 4 carateres.');
+      return;
+    }
+
+    // Grava o perfil no navegador e autentica
+    onLoginSuccess(email);
   };
 
   return (
     <div className="flex-1 flex items-center justify-center p-6 w-full relative overflow-hidden bg-gradient-to-b from-[#07090e] via-zinc-950 to-black">
-      {/* Luz ambiente de fundo */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[340px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-lg rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-2xl p-8 sm:p-10 shadow-[0_25px_80px_-20px_rgba(0,0,0,0.9)] text-center flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-2xl p-8 shadow-[0_25px_80px_-20px_rgba(0,0,0,0.9)] flex flex-col items-center">
         
-        {/* Ícone de Cadeado / Brasão */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-600/30 via-amber-500/20 to-amber-300/10 border border-amber-500/30 flex items-center justify-center mb-6 shadow-lg shadow-amber-500/10">
-          <Lock className="w-7 h-7 text-amber-400 stroke-[2]" />
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4 text-amber-400">
+          <Lock className="w-6 h-6 stroke-[2]" />
         </div>
 
-        <span className="px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-3">
-          Acesso Restrito a Alunos
+        <span className="px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
+          Acesso Restrito
         </span>
 
-        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-snug">
-          Identifique-se para Estudar
+        <h2 className="text-2xl font-bold text-white tracking-tight">
+          {isSignUp ? 'Criar Conta de Aluno' : 'Entrar na Plataforma'}
         </h2>
-
-        <p className="text-xs sm:text-sm text-zinc-400 mt-2.5 max-w-sm leading-relaxed font-light">
-          A grade curricular, o reprodutor de vídeo e os cadernos de estudo estão bloqueados para visitantes anônimos.
+        <p className="text-xs text-zinc-400 mt-1 mb-6 text-center font-light leading-relaxed">
+          {isSignUp 
+            ? 'Registe-se com qualquer e-mail para desbloquear todas as aulas e guardar o seu progresso.' 
+            : 'Introduza o seu e-mail e palavra-passe para aceder ao catálogo.'}
         </p>
 
-        {/* Vantagens ao fazer login */}
-        <div className="w-full my-7 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] text-left space-y-2.5">
-          <div className="flex items-center gap-3 text-xs text-zinc-300">
-            <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Acesso completo aos 3 níveis (Básico, Intermediário e Avançado)</span>
+        {error && (
+          <div className="w-full mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 text-center">
+            {error}
           </div>
-          <div className="flex items-center gap-3 text-xs text-zinc-300">
-            <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Evolução de ranks históricos (de Catecúmeno a Doutor da Igreja)</span>
+        )}
+
+        <form onSubmit={handleSubmit} className="w-full space-y-3.5">
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">E-mail</label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+              <input
+                type="email"
+                required
+                placeholder="qualquer@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-600 outline-none transition-colors"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-zinc-300">
-            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Guias exegéticos e resumos gerados com IA sob demanda</span>
+
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">Palavra-passe</label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+              <input
+                type="password"
+                required
+                placeholder="Introduza uma palavra-passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-600 outline-none transition-colors"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-zinc-300">
-            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Progresso sincronizado na nuvem em tempo real</span>
-          </div>
+
+          <button
+            type="submit"
+            className="w-full mt-2 py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs transition-all shadow-lg active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>{isSignUp ? 'Registar e Entrar' : 'Entrar nas Aulas'}</span>
+          </button>
+        </form>
+
+        <div className="mt-5 flex items-center justify-between w-full pt-4 border-t border-white/[0.06] text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError(null);
+            }}
+            className="text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer"
+          >
+            {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Registe-se'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onBackHome}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+          >
+            Voltar ao Início
+          </button>
         </div>
-
-        {/* Botão de Login com Google */}
-        <button
-          onClick={handleAction}
-          disabled={isLoggingIn}
-          className="w-full py-3 px-5 rounded-2xl bg-white hover:bg-amber-400 text-black font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-3 shadow-xl hover:shadow-amber-500/10 active:scale-[0.99] disabled:opacity-60 cursor-pointer group"
-        >
-          {isLoggingIn ? (
-            <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-          ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-          )}
-          <span className="tracking-wide">
-            {isLoggingIn ? 'Conectando ao Google...' : 'Entrar com Conta Google'}
-          </span>
-        </button>
-
-        <button
-          onClick={onBackHome}
-          className="mt-4 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-        >
-          Voltar para a página inicial
-        </button>
       </div>
     </div>
   );
@@ -151,10 +176,13 @@ export default function App() {
   const [showTrophyModal, setShowTrophyModal] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
-  // Utilizador do Firebase
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Utilizador Autenticado Localmente
+  const [currentUser, setCurrentUser] = useState<LocalUser | null>(() => {
+    const saved = localStorage.getItem('teologia_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
 
-  // Estados de Gamificação
+  // Gamificação e Progresso
   const [userXp, setUserXp] = useState<number>(() => {
     const saved = localStorage.getItem('teologia_xp');
     return saved ? parseInt(saved, 10) : 0;
@@ -163,22 +191,18 @@ export default function App() {
     const saved = localStorage.getItem('teologia_badges');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [playbackProgress, setPlaybackProgress] = useState<Record<string, WatchProgress>>(() => {
     const saved = localStorage.getItem('teologia_playback_progress');
     return saved ? JSON.parse(saved) : {};
   });
-
   const [lastWatchedKey, setLastWatchedKey] = useState<string | null>(() => {
     const saved = localStorage.getItem('teologia_last_watched_key');
     return saved ? JSON.parse(saved) : null;
   });
-
   const [completedLessons, setCompletedLessons] = useState<string[]>(() => {
     const saved = localStorage.getItem('teologia_completed');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [notes, setNotes] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('teologia_notes');
     return saved ? JSON.parse(saved) : {};
@@ -188,7 +212,7 @@ export default function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estados da IA
+  // IA
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -197,68 +221,24 @@ export default function App() {
 
   const getLessonKey = (lesson: Lesson) => `${lesson.level || 'basico'}_${lesson.telegram_msg_id}`;
 
-  // 1. Ouvir estado de autenticação do Firebase
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        await loadUserDataFromFirestore(user.uid);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // 2. Carregar dados do Cloud Firestore
-  const loadUserDataFromFirestore = async (uid: string) => {
-    try {
-      const userDocRef = doc(db, 'users', uid);
-      const snapshot = await getDoc(userDocRef);
-
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        if (data.xp !== undefined) {
-          setUserXp(data.xp);
-          localStorage.setItem('teologia_xp', data.xp.toString());
-        }
-        if (data.badges) {
-          setUnlockedBadges(data.badges);
-          localStorage.setItem('teologia_badges', JSON.stringify(data.badges));
-        }
-        if (data.completed) {
-          setCompletedLessons(data.completed);
-          localStorage.setItem('teologia_completed', JSON.stringify(data.completed));
-        }
-        if (data.playbackProgress) {
-          setPlaybackProgress((prev) => ({ ...prev, ...data.playbackProgress }));
-          localStorage.setItem('teologia_playback_progress', JSON.stringify({ ...playbackProgress, ...data.playbackProgress }));
-        }
-        if (data.notes) {
-          setNotes((prev) => ({ ...prev, ...data.notes }));
-          localStorage.setItem('teologia_notes', JSON.stringify({ ...notes, ...data.notes }));
-        }
-      }
-    } catch (err) {
-      console.error('Erro ao ler dados do Firestore:', err);
-    }
+  const handleLoginSuccess = (email: string) => {
+    const user: LocalUser = {
+      email,
+      name: email.split('@')[0]
+    };
+    setCurrentUser(user);
+    localStorage.setItem('teologia_current_user', JSON.stringify(user));
+    setCurrentView('aulas');
+    confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
   };
 
-  // 3. Login com Google (Popup Nativo)
-  const handleGoogleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      setCurrentView('aulas');
-    } catch (err) {
-      console.error('Falha no login com Google:', err);
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
+  const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('teologia_current_user');
     setCurrentView('home');
   };
 
-  // 4. Carregar catálogo de aulas
+  // Carregar aulas da FastAPI
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/lessons`)
       .then((res) => res.json())
@@ -288,50 +268,25 @@ export default function App() {
       });
   }, []);
 
-  // 5. Atribuir XP e atualizar Firestore
-  const awardXp = async (amount: number) => {
+  const awardXp = (amount: number) => {
     const newXp = userXp + amount;
     setUserXp(newXp);
     localStorage.setItem('teologia_xp', newXp.toString());
-
-    if (currentUser) {
-      await setDoc(doc(db, 'users', currentUser.uid), { xp: newXp }, { merge: true });
-    }
-
     checkAchievements(newXp, completedLessons);
   };
 
-  // 6. Verificar Conquistas
-  const checkAchievements = async (currentXp: number, currentCompleted: string[]) => {
+  const checkAchievements = (currentXp: number, currentCompleted: string[]) => {
     const toUnlock: string[] = [];
-
-    if (currentCompleted.length >= 1 && !unlockedBadges.includes('first_lesson')) {
-      toUnlock.push('first_lesson');
-    }
-    if (currentCompleted.length >= 5 && !unlockedBadges.includes('five_lessons')) {
-      toUnlock.push('five_lessons');
-    }
-    if (Object.keys(notes).length >= 1 && !unlockedBadges.includes('first_note')) {
-      toUnlock.push('first_note');
-    }
-    if (calculateRank(currentXp).level >= 5 && !unlockedBadges.includes('exegete_rank')) {
-      toUnlock.push('exegete_rank');
-    }
+    if (currentCompleted.length >= 1 && !unlockedBadges.includes('first_lesson')) toUnlock.push('first_lesson');
+    if (currentCompleted.length >= 5 && !unlockedBadges.includes('five_lessons')) toUnlock.push('five_lessons');
+    if (Object.keys(notes).length >= 1 && !unlockedBadges.includes('first_note')) toUnlock.push('first_note');
+    if (calculateRank(currentXp).level >= 5 && !unlockedBadges.includes('exegete_rank')) toUnlock.push('exegete_rank');
 
     if (toUnlock.length > 0) {
       const updated = [...unlockedBadges, ...toUnlock];
       setUnlockedBadges(updated);
       localStorage.setItem('teologia_badges', JSON.stringify(updated));
-
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-
-      if (currentUser) {
-        await setDoc(doc(db, 'users', currentUser.uid), { badges: updated }, { merge: true });
-      }
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
     }
   };
 
@@ -345,9 +300,7 @@ export default function App() {
     fetch(`${API_BASE_URL}/api/lessons/${activeLesson.telegram_msg_id}/summary`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.summary) {
-          setAiSummary(data.summary);
-        }
+        if (data.summary) setAiSummary(data.summary);
       })
       .catch(() => {});
   }, [activeLesson, notes]);
@@ -382,19 +335,13 @@ export default function App() {
       localStorage.setItem('teologia_last_watched_key', JSON.stringify(key));
       setLastWatchedKey(key);
 
-      if (currentUser) {
-        setDoc(doc(db, 'users', currentUser.uid), {
-          playbackProgress: { [key]: updated }
-        }, { merge: true });
-      }
-
       if (updated.percentage > 90 && !completedLessons.includes(key)) {
         toggleComplete(activeLesson);
       }
     }
   };
 
-  // Trava de segurança: Iniciar aula requer autenticação
+  // Bloqueio de navegação sem login
   const startLesson = (lesson: Lesson) => {
     if (!currentUser) {
       setCurrentView('login');
@@ -405,7 +352,6 @@ export default function App() {
     setCurrentView('player');
   };
 
-  // Trava de segurança: Navegar para Aulas requer autenticação
   const handleNavigateToAulas = (targetLevel?: CourseLevel) => {
     if (targetLevel) setSelectedLevel(targetLevel);
     if (!currentUser) {
@@ -415,7 +361,7 @@ export default function App() {
     setCurrentView('aulas');
   };
 
-  const toggleComplete = async (lesson: Lesson) => {
+  const toggleComplete = (lesson: Lesson) => {
     const key = getLessonKey(lesson);
     const isNowDone = !completedLessons.includes(key);
     const updated = isNowDone
@@ -429,13 +375,9 @@ export default function App() {
       awardXp(50);
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
     }
-
-    if (currentUser) {
-      await setDoc(doc(db, 'users', currentUser.uid), { completed: updated }, { merge: true });
-    }
   };
 
-  const handleNoteChange = async (text: string) => {
+  const handleNoteChange = (text: string) => {
     setCurrentNote(text);
     if (!activeLesson) return;
     const key = getLessonKey(activeLesson);
@@ -445,12 +387,6 @@ export default function App() {
 
     if (!notes[key] && text.trim().length > 10) {
       awardXp(15);
-    }
-
-    if (currentUser) {
-      await setDoc(doc(db, 'users', currentUser.uid), {
-        notes: { [key]: text }
-      }, { merge: true });
     }
   };
 
@@ -494,7 +430,7 @@ export default function App() {
   return (
     <div className="h-screen w-screen bg-[#07090e] text-zinc-100 flex flex-col overflow-hidden font-sans selection:bg-amber-500/30 selection:text-amber-200">
       
-      {/* 1. Barra Superior Minimalista Apple TV com HUD de Gamificação & Auth */}
+      {/* 1. Barra Superior Minimalista Apple TV */}
       <header className="h-16 px-6 md:px-8 flex items-center justify-between border-b border-white/[0.06] bg-black/40 backdrop-blur-2xl z-30 shrink-0">
         <div className="flex items-center gap-6">
           <div 
@@ -548,7 +484,7 @@ export default function App() {
           </nav>
         </div>
 
-        {/* 2. HUD de Gamificação & Conta Firebase */}
+        {/* 2. HUD de Gamificação & Conta do Aluno */}
         <div className="flex items-center gap-3">
           <div 
             onClick={() => setShowTrophyModal(true)}
@@ -584,17 +520,9 @@ export default function App() {
 
           {currentUser ? (
             <div className="flex items-center gap-2 pl-2 border-l border-white/[0.08]">
-              {currentUser.photoURL ? (
-                <img 
-                  src={currentUser.photoURL} 
-                  alt="Avatar" 
-                  className="w-8 h-8 rounded-full border border-amber-400/40 object-cover" 
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-xs text-amber-300 font-bold">
-                  {currentUser.email?.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xs text-amber-300 font-bold uppercase">
+                {currentUser.name.charAt(0)}
+              </div>
               <button
                 onClick={handleLogout}
                 className="w-8 h-8 rounded-full bg-white/[0.04] hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 flex items-center justify-center transition-all cursor-pointer"
@@ -609,7 +537,7 @@ export default function App() {
               className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-black hover:bg-amber-400 text-xs font-semibold transition-all shadow-md cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Entrar com Gmail</span>
+              <span>Entrar / Cadastrar</span>
             </button>
           )}
         </div>
@@ -618,15 +546,15 @@ export default function App() {
       {/* 3. Área Central */}
       <div className="flex-1 flex overflow-hidden relative">
 
-        {/* ==================== VISTA 0: TELA DE LOGIN / BLOQUEIO ==================== */}
+        {/* VISTA 0: LOGIN LOCAL */}
         {currentView === 'login' && (
-          <LoginScreen 
-            onLogin={handleGoogleLogin} 
+          <SimpleLoginScreen 
+            onLoginSuccess={handleLoginSuccess} 
             onBackHome={() => setCurrentView('home')} 
           />
         )}
 
-        {/* ==================== VISTA 1: INÍCIO ==================== */}
+        {/* VISTA 1: INÍCIO */}
         {currentView === 'home' && (
           <main className="flex-1 overflow-y-auto p-6 md:p-10 w-full">
             <div className="max-w-6xl mx-auto w-full space-y-10">
@@ -698,7 +626,7 @@ export default function App() {
                 </div>
               ) : null}
 
-              {/* Níveis do Curso */}
+              {/* Níveis */}
               <div>
                 <h2 className="text-base font-semibold text-white tracking-wide flex items-center gap-2 mb-4">
                   <GraduationCap className="w-4 h-4 text-amber-400" />
@@ -743,7 +671,7 @@ export default function App() {
 
                         <div className="mt-6 flex items-center justify-between pt-4 border-t border-white/[0.04]">
                           <span className="text-xs text-zinc-500 font-medium">
-                            {currentUser ? 'Acessar grade de aulas' : 'Entrar para acessar'}
+                            {currentUser ? 'Aceder à grade de aulas' : 'Entrar para aceder'}
                           </span>
                           <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
                         </div>
@@ -756,11 +684,11 @@ export default function App() {
           </main>
         )}
 
-        {/* ==================== VISTA 2: AULAS E MÓDULOS (TRAVA SE !currentUser) ==================== */}
+        {/* VISTA 2: AULAS */}
         {currentView === 'aulas' && (
           !currentUser ? (
-            <LoginScreen 
-              onLogin={handleGoogleLogin} 
+            <SimpleLoginScreen 
+              onLoginSuccess={handleLoginSuccess} 
               onBackHome={() => setCurrentView('home')} 
             />
           ) : (
@@ -898,11 +826,11 @@ export default function App() {
           )
         )}
 
-        {/* ==================== VISTA 3: PLAYER (TRAVA SE !currentUser) ==================== */}
+        {/* VISTA 3: PLAYER */}
         {currentView === 'player' && (
           !currentUser || !activeLesson ? (
-            <LoginScreen 
-              onLogin={handleGoogleLogin} 
+            <SimpleLoginScreen 
+              onLoginSuccess={handleLoginSuccess} 
               onBackHome={() => setCurrentView('home')} 
             />
           ) : (
@@ -974,7 +902,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Guia de Estudo da IA */}
+                {/* Guia com IA */}
                 <div className="p-6 md:p-8 rounded-3xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md flex flex-col gap-5">
                   <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/[0.06]">
                     <div className="flex items-center gap-2.5">
@@ -986,7 +914,7 @@ export default function App() {
                           Guia Teológico de Estudo
                         </h3>
                         <p className="text-[11px] text-zinc-500">
-                          Síntese conceitual, bases históricas e referências
+                          Síntese conceptual, bases históricas e referências
                         </p>
                       </div>
                     </div>
@@ -1052,14 +980,14 @@ export default function App() {
                     <div className="py-12 flex flex-col items-center justify-center text-center text-zinc-500 gap-2.5">
                       <BookOpenCheck className="w-8 h-8 text-zinc-600 stroke-[1.5]" />
                       <p className="text-xs max-w-sm leading-relaxed">
-                        Clique em <span className="text-amber-400 font-medium">"Gerar Guia com IA"</span> para obter a análise exegética e o resumo estruturado desta aula.
+                        Clica em <span className="text-amber-400 font-medium">"Gerar Guia com IA"</span> para obter a análise exegética e o resumo estruturado desta aula.
                       </p>
                     </div>
                   ) : (
                     <div className="py-12 flex flex-col items-center justify-center text-center gap-3">
                       <div className="w-6 h-6 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
                       <p className="text-xs text-zinc-400 animate-pulse">
-                        Construindo o sumário teológico...
+                        A construir o sumário teológico...
                       </p>
                     </div>
                   )}
@@ -1070,7 +998,7 @@ export default function App() {
           )
         )}
 
-        {/* 4. Modal: Sala de Troféus e Títulos Teológicos */}
+        {/* 4. Modal de Troféus */}
         {showTrophyModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-xl animate-in fade-in duration-200">
             <div 
@@ -1156,39 +1084,6 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
-
-        {/* 5. Gaveta de Anotações */}
-        {showNotesDrawer && activeLesson && (
-          <aside className="w-96 border-l border-white/[0.08] bg-black/60 backdrop-blur-2xl p-6 flex flex-col z-20 transition-all duration-300 animate-in slide-in-from-right-10">
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-4">
-              <div className="flex items-center gap-2">
-                <PenLine className="w-4 h-4 text-amber-400" />
-                <h3 className="text-sm font-semibold text-white">Caderno de Estudos</h3>
-              </div>
-              <button 
-                onClick={() => setShowNotesDrawer(false)}
-                className="w-7 h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 flex flex-col">
-              <label className="text-[11px] font-medium text-zinc-400 mb-2">
-                Notas de <span className="text-white font-semibold">Aula {activeLesson.id} ({activeLesson.level || 'basico'})</span>
-              </label>
-              <textarea
-                value={currentNote}
-                onChange={(e) => handleNoteChange(e.target.value)}
-                placeholder="Registre termos originais (hebraico/grego), passagens bíblicas ou notas de aula..."
-                className="w-full flex-1 bg-white/[0.03] focus:bg-white/[0.06] border border-white/[0.08] focus:border-amber-400/40 rounded-2xl p-4 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none leading-relaxed transition-all"
-              />
-              <p className="text-[10px] text-zinc-500 mt-2 text-center">
-                {currentUser ? '☁️ Sincronizado no Firestore' : '💾 Guardado localmente no navegador'}
-              </p>
-            </div>
-          </aside>
         )}
 
       </div>
