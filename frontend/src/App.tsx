@@ -5,7 +5,6 @@ import {
   CheckCircle2, 
   Search, 
   Clock, 
-  Tv, 
   PenLine, 
   X, 
   ArrowRight,
@@ -32,7 +31,7 @@ interface LocalUser {
   name: string;
 }
 
-// Ecrã de Login simples
+// Ecrã de Login e Cadastro Simplificado
 function SimpleLoginScreen({ 
   onLoginSuccess, 
   onBackHome 
@@ -50,12 +49,12 @@ function SimpleLoginScreen({
     setError(null);
 
     if (!email.includes('@') || !email.includes('.')) {
-      setError('Por favor, informe um e-mail válido.');
+      setError('Por favor, introduz um e-mail válido.');
       return;
     }
 
     if (password.length < 4) {
-      setError('A senha deve ter pelo menos 4 caracteres.');
+      setError('A palavra-passe deve ter pelo menos 4 carateres.');
       return;
     }
 
@@ -79,7 +78,7 @@ function SimpleLoginScreen({
           {isSignUp ? 'Criar Conta de Aluno' : 'Entrar na Plataforma'}
         </h2>
         <p className="text-xs text-zinc-400 mt-1 mb-6 text-center font-light leading-relaxed">
-          Informe seu e-mail e senha para acessar as aulas e salvar seu progresso.
+          Introduz o teu e-mail e palavra-passe para aceder às aulas e guardar o teu progresso.
         </p>
 
         {error && (
@@ -96,7 +95,7 @@ function SimpleLoginScreen({
               <input
                 type="email"
                 required
-                placeholder="seuemail@exemplo.com"
+                placeholder="teuemail@exemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-600 outline-none transition-colors"
@@ -105,13 +104,13 @@ function SimpleLoginScreen({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-zinc-400 block mb-1">Senha</label>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">Palavra-passe</label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
               <input
                 type="password"
                 required
-                placeholder="Informe sua senha"
+                placeholder="Introduz a tua palavra-passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-600 outline-none transition-colors"
@@ -123,7 +122,7 @@ function SimpleLoginScreen({
             type="submit"
             className="w-full mt-2 py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs transition-all shadow-lg active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
           >
-            <span>{isSignUp ? 'Cadastrar e Entrar' : 'Entrar nas Aulas'}</span>
+            <span>{isSignUp ? 'Registar e Entrar' : 'Entrar nas Aulas'}</span>
           </button>
         </form>
 
@@ -136,7 +135,7 @@ function SimpleLoginScreen({
             }}
             className="text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer"
           >
-            {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se'}
+            {isSignUp ? 'Já tens conta? Entrar' : 'Não tens conta? Regista-te'}
           </button>
 
           <button
@@ -217,11 +216,15 @@ export default function App() {
     setCurrentView('home');
   };
 
-  // Carregar aulas do backend
+  // Carregar aulas: tenta API local, com fallback automático para catalogo_aulas.json estático na Vercel
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/lessons`)
-      .then((res) => res.json())
-      .then((data: Lesson[]) => {
+    const loadLessons = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/lessons`).catch(() => null);
+        const data: Lesson[] = (res && res.ok) 
+          ? await res.json() 
+          : await fetch('/catalogo_aulas.json').then((r) => r.json());
+
         const normalized: Lesson[] = data.map((l, index) => ({
           ...l,
           id: l.id || index + 1,
@@ -240,10 +243,12 @@ export default function App() {
             setActiveLesson(normalized[0]);
           }
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Erro ao carregar catálogo:', err);
-      });
+      }
+    };
+
+    loadLessons();
   }, []);
 
   const awardXp = (amount: number) => {
@@ -393,18 +398,19 @@ export default function App() {
   return (
     <div className="h-screen w-screen bg-[#07090e] text-zinc-100 flex flex-col overflow-hidden font-sans selection:bg-amber-500/30 selection:text-amber-200">
       
-      {/* 1. Header Apple TV */}
+      {/* 1. Header Apple TV com Logo em Selo Académico */}
       <header className="h-16 px-6 md:px-8 flex items-center justify-between border-b border-white/[0.06] bg-black/40 backdrop-blur-2xl z-30 shrink-0">
         <div className="flex items-center gap-6">
           <div 
             onClick={() => setCurrentView('home')}
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center gap-3 cursor-pointer group select-none"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-500 to-amber-200 flex items-center justify-center shadow-lg shadow-amber-500/10">
-              <Tv className="w-4 h-4 text-black stroke-[2.5]" />
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 bg-amber-500/15 rounded-full blur-md group-hover:bg-amber-400/25 transition-all" />
+              <GraduationCap className="w-8 h-8 relative z-10 transition-transform duration-300 group-hover:scale-105 text-amber-400" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight text-white group-hover:text-amber-400 transition-colors">
+            <div className="flex flex-col text-left">
+              <span className="text-sm font-bold tracking-tight text-white group-hover:text-amber-400 transition-colors">
                 Teologia
               </span>
               <span className="text-[10px] text-zinc-400 -mt-0.5 tracking-wider uppercase font-medium">
@@ -500,7 +506,7 @@ export default function App() {
               className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-black hover:bg-amber-400 text-xs font-semibold transition-all shadow-md cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Entrar / Cadastrar</span>
+              <span>Entrar / Registar</span>
             </button>
           )}
         </div>
@@ -526,7 +532,7 @@ export default function App() {
                   <div className="max-w-xl z-10">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Continuar Assistindo • {(resumeLesson.level || 'basico').toUpperCase()}
+                        Continuar a Assistir • {(resumeLesson.level || 'basico').toUpperCase()}
                       </span>
                       <span className="text-xs text-zinc-400">
                         Aula {resumeLesson.id} • {resumeLesson.duration_formatted}
@@ -583,7 +589,7 @@ export default function App() {
                 </div>
               ) : null}
 
-              {/* Níveis */}
+              {/* Níveis do Curso */}
               <div>
                 <h2 className="text-base font-semibold text-white tracking-wide flex items-center gap-2 mb-4">
                   <GraduationCap className="w-4 h-4 text-amber-400" />
@@ -620,7 +626,7 @@ export default function App() {
                         </div>
 
                         <div className="mt-6 flex items-center justify-between pt-4 border-t border-white/[0.04]">
-                          <span className="text-xs text-zinc-500 font-medium">Acessar grade de aulas</span>
+                          <span className="text-xs text-zinc-500 font-medium">Aceder à grade de aulas</span>
                           <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
                         </div>
                       </div>
@@ -649,7 +655,7 @@ export default function App() {
                       Grade de Aulas ({selectedLevel.toUpperCase()})
                     </h1>
                     <p className="text-xs text-zinc-400 mt-1">
-                      {filteredLessons.length} aulas na sequência exata do Telegram
+                      {filteredLessons.length} aulas na sequência do catálogo
                     </p>
                   </div>
 
@@ -657,7 +663,7 @@ export default function App() {
                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500" />
                     <input
                       type="text"
-                      placeholder="Pesquisar por título ou texto..."
+                      placeholder="Pesquisar por título ou tema..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/40 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
@@ -721,7 +727,7 @@ export default function App() {
           )
         )}
 
-        {/* VISTA 3: PLAYER COM BOTÕES DE PRÓXIMA / ANTERIOR (SEM IA) */}
+        {/* VISTA 3: PLAYER COM ANTERIOR / PRÓXIMO */}
         {currentView === 'player' && (
           !currentUser || !activeLesson ? (
             <SimpleLoginScreen 
@@ -810,7 +816,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* BARRA DE NAVEGAÇÃO: AULA ANTERIOR / PRÓXIMA AULA */}
+                {/* NAVEGAÇÃO: AULA ANTERIOR / PRÓXIMA AULA */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button
                     onClick={handlePreviousLesson}
@@ -845,11 +851,11 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Legenda Original Completa da Postagem */}
+                {/* Informações da Lição */}
                 {activeLesson.description && (
                   <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block mb-2">
-                      Informações da Lição (Telegram)
+                      Informações da Lição
                     </span>
                     <p className="text-xs leading-relaxed text-zinc-300 whitespace-pre-line font-light">
                       {activeLesson.description}
@@ -970,7 +976,7 @@ export default function App() {
               <textarea
                 value={currentNote}
                 onChange={(e) => handleNoteChange(e.target.value)}
-                placeholder="Escreva suas anotações aqui..."
+                placeholder="Escreve as tuas anotações aqui..."
                 className="w-full flex-1 bg-white/[0.03] focus:bg-white/[0.06] border border-white/[0.08] focus:border-amber-400/40 rounded-2xl p-4 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none leading-relaxed transition-all"
               />
             </div>
