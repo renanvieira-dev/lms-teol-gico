@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
 import confetti from 'canvas-confetti';
 import { 
   Play, 
@@ -9,14 +8,11 @@ import {
   Tv, 
   PenLine, 
   X, 
-  Sparkles, 
-  BookOpenCheck,
   ArrowRight,
+  ArrowLeft,
   Layers,
   Home,
   GraduationCap,
-  ChevronDown,
-  FolderTree,
   Award,
   Trophy,
   LogIn,
@@ -24,15 +20,11 @@ import {
   Lock,
   Mail,
   KeyRound,
-  ShieldCheck,
-  BookOpen
+  SkipBack,
+  SkipForward
 } from 'lucide-react';
 import type { Lesson, CourseLevel, WatchProgress } from './types';
-import { 
-  ACHIEVEMENTS_LIST, 
-  calculateRank, 
-  getNextRank 
-} from './gamification';
+import { ACHIEVEMENTS_LIST, calculateRank, getNextRank } from './gamification';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
@@ -41,7 +33,7 @@ interface LocalUser {
   name: string;
 }
 
-// Ecrã de Login & Registo sem dependência de APIs externas
+// Ecrã de Login simples
 function SimpleLoginScreen({ 
   onLoginSuccess, 
   onBackHome 
@@ -59,16 +51,15 @@ function SimpleLoginScreen({
     setError(null);
 
     if (!email.includes('@') || !email.includes('.')) {
-      setError('Por favor, introduza um e-mail válido.');
+      setError('Por favor, informe um e-mail válido.');
       return;
     }
 
     if (password.length < 4) {
-      setError('A palavra-passe deve ter pelo menos 4 carateres.');
+      setError('A senha deve ter pelo menos 4 caracteres.');
       return;
     }
 
-    // Grava o perfil no navegador e autentica
     onLoginSuccess(email);
   };
 
@@ -77,7 +68,6 @@ function SimpleLoginScreen({
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[340px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-2xl p-8 shadow-[0_25px_80px_-20px_rgba(0,0,0,0.9)] flex flex-col items-center">
-        
         <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4 text-amber-400">
           <Lock className="w-6 h-6 stroke-[2]" />
         </div>
@@ -90,9 +80,7 @@ function SimpleLoginScreen({
           {isSignUp ? 'Criar Conta de Aluno' : 'Entrar na Plataforma'}
         </h2>
         <p className="text-xs text-zinc-400 mt-1 mb-6 text-center font-light leading-relaxed">
-          {isSignUp 
-            ? 'Registe-se com qualquer e-mail para desbloquear todas as aulas e guardar o seu progresso.' 
-            : 'Introduza o seu e-mail e palavra-passe para aceder ao catálogo.'}
+          Informe seu e-mail e senha para acessar as aulas e salvar seu progresso.
         </p>
 
         {error && (
@@ -109,7 +97,7 @@ function SimpleLoginScreen({
               <input
                 type="email"
                 required
-                placeholder="qualquer@email.com"
+                placeholder="seuemail@exemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-600 outline-none transition-colors"
@@ -118,13 +106,13 @@ function SimpleLoginScreen({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-zinc-400 block mb-1">Palavra-passe</label>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">Senha</label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
               <input
                 type="password"
                 required
-                placeholder="Introduza uma palavra-passe"
+                placeholder="Informe sua senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-600 outline-none transition-colors"
@@ -136,7 +124,7 @@ function SimpleLoginScreen({
             type="submit"
             className="w-full mt-2 py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs transition-all shadow-lg active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
           >
-            <span>{isSignUp ? 'Registar e Entrar' : 'Entrar nas Aulas'}</span>
+            <span>{isSignUp ? 'Cadastrar e Entrar' : 'Entrar nas Aulas'}</span>
           </button>
         </form>
 
@@ -149,7 +137,7 @@ function SimpleLoginScreen({
             }}
             className="text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer"
           >
-            {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Registe-se'}
+            {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se'}
           </button>
 
           <button
@@ -174,9 +162,8 @@ export default function App() {
   
   const [showNotesDrawer, setShowNotesDrawer] = useState(false);
   const [showTrophyModal, setShowTrophyModal] = useState(false);
-  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
-  // Utilizador Autenticado Localmente
+  // Utilizador Local
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(() => {
     const saved = localStorage.getItem('teologia_current_user');
     return saved ? JSON.parse(saved) : null;
@@ -210,13 +197,6 @@ export default function App() {
 
   const [currentNote, setCurrentNote] = useState('');
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // IA
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
-
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const getLessonKey = (lesson: Lesson) => `${lesson.level || 'basico'}_${lesson.telegram_msg_id}`;
@@ -238,20 +218,20 @@ export default function App() {
     setCurrentView('home');
   };
 
-  // Carregar aulas da FastAPI
+  // Carregar aulas do backend
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/lessons`)
       .then((res) => res.json())
       .then((data: Lesson[]) => {
-        const normalized: Lesson[] = data.map((l) => ({
+        const normalized: Lesson[] = data.map((l, index) => ({
           ...l,
+          id: l.id || index + 1,
           level: (l.level as CourseLevel) || 'basico',
-          module: l.module || 'Módulo Geral',
-          title: l.title || `Aula ${l.id}`
+          module: l.module || 'Catálogo do Curso',
+          title: l.title || `Aula ${index + 1}`
         }));
 
         setLessons(normalized);
-        setIsLoading(false);
 
         if (normalized.length > 0) {
           if (lastWatchedKey) {
@@ -264,7 +244,6 @@ export default function App() {
       })
       .catch((err) => {
         console.error('Erro ao carregar catálogo:', err);
-        setIsLoading(false);
       });
   }, []);
 
@@ -294,15 +273,6 @@ export default function App() {
     if (!activeLesson) return;
     const key = getLessonKey(activeLesson);
     setCurrentNote(notes[key] || '');
-    setAiSummary(null);
-    setSummaryError(null);
-
-    fetch(`${API_BASE_URL}/api/lessons/${activeLesson.telegram_msg_id}/summary`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.summary) setAiSummary(data.summary);
-      })
-      .catch(() => {});
   }, [activeLesson, notes]);
 
   const handleLoadedMetadata = () => {
@@ -341,7 +311,6 @@ export default function App() {
     }
   };
 
-  // Bloqueio de navegação sem login
   const startLesson = (lesson: Lesson) => {
     if (!currentUser) {
       setCurrentView('login');
@@ -390,23 +359,21 @@ export default function App() {
     }
   };
 
-  const handleGenerateAiSummary = async () => {
-    if (!activeLesson) return;
-    setIsGeneratingSummary(true);
-    setSummaryError(null);
+  // Navegação: Próxima e Anterior
+  const currentLevelLessons = lessons.filter((l) => (l.level || 'basico') === selectedLevel);
+  const currentIndex = activeLesson ? currentLevelLessons.findIndex((l) => l.telegram_msg_id === activeLesson.telegram_msg_id) : -1;
+  const hasPrevious = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < currentLevelLessons.length - 1;
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/lessons/${activeLesson.telegram_msg_id}/generate-summary`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Falha ao gerar resumo');
-      setAiSummary(data.summary);
-      awardXp(20);
-    } catch (err: any) {
-      setSummaryError(err.message || 'Erro ao comunicar com a IA');
-    } finally {
-      setIsGeneratingSummary(false);
+  const handlePreviousLesson = () => {
+    if (hasPrevious) {
+      startLesson(currentLevelLessons[currentIndex - 1]);
+    }
+  };
+
+  const handleNextLesson = () => {
+    if (hasNext) {
+      startLesson(currentLevelLessons[currentIndex + 1]);
     }
   };
 
@@ -416,13 +383,10 @@ export default function App() {
   const xpNeeded = nextRank ? nextRank.minXp - currentRank.minXp : 1000;
   const levelProgress = nextRank ? Math.min(100, Math.round((xpInLevel / xpNeeded) * 100)) : 100;
 
-  const currentLevelLessons = lessons.filter((l) => (l.level || 'basico') === selectedLevel);
-  const groupedModules = currentLevelLessons.reduce((acc, lesson) => {
-    const mod = lesson.module || 'Módulo Geral';
-    if (!acc[mod]) acc[mod] = [];
-    acc[mod].push(lesson);
-    return acc;
-  }, {} as Record<string, Lesson[]>);
+  const filteredLessons = currentLevelLessons.filter((l) => 
+    l.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    l.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const resumeLesson = activeLesson || lessons[0];
   const resumeProgress = resumeLesson ? playbackProgress[getLessonKey(resumeLesson)] : null;
@@ -430,7 +394,7 @@ export default function App() {
   return (
     <div className="h-screen w-screen bg-[#07090e] text-zinc-100 flex flex-col overflow-hidden font-sans selection:bg-amber-500/30 selection:text-amber-200">
       
-      {/* 1. Barra Superior Minimalista Apple TV */}
+      {/* 1. Header Apple TV */}
       <header className="h-16 px-6 md:px-8 flex items-center justify-between border-b border-white/[0.06] bg-black/40 backdrop-blur-2xl z-30 shrink-0">
         <div className="flex items-center gap-6">
           <div 
@@ -484,7 +448,7 @@ export default function App() {
           </nav>
         </div>
 
-        {/* 2. HUD de Gamificação & Conta do Aluno */}
+        {/* 2. Gamificação & Login */}
         <div className="flex items-center gap-3">
           <div 
             onClick={() => setShowTrophyModal(true)}
@@ -543,10 +507,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* 3. Área Central */}
+      {/* 3. Conteúdo Principal */}
       <div className="flex-1 flex overflow-hidden relative">
 
-        {/* VISTA 0: LOGIN LOCAL */}
+        {/* VISTA 0: LOGIN */}
         {currentView === 'login' && (
           <SimpleLoginScreen 
             onLoginSuccess={handleLoginSuccess} 
@@ -573,12 +537,6 @@ export default function App() {
                     <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-snug">
                       {resumeLesson.title}
                     </h1>
-
-                    {resumeLesson.description && (
-                      <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed font-light">
-                        {resumeLesson.description}
-                      </p>
-                    )}
 
                     {resumeProgress && (
                       <div className="mt-5 max-w-md">
@@ -608,7 +566,7 @@ export default function App() {
                         className="px-5 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-medium transition-all flex items-center gap-2 cursor-pointer"
                       >
                         <Layers className="w-4 h-4" />
-                        <span>Explorar Módulos</span>
+                        <span>Ver Grade Completa</span>
                         {!currentUser && <Lock className="w-3 h-3 text-zinc-400" />}
                       </button>
                     </div>
@@ -635,7 +593,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   {[
-                    { id: 'basico', title: 'Básico', desc: 'Introdução bíblica, panorama geral e princípios essenciais da fé cristã.' },
+                    { id: 'basico', title: 'Básico', desc: 'Introdução bíblica, panorama geral e fundamentos cristãos.' },
                     { id: 'intermediario', title: 'Intermediário', desc: 'Teologia histórica, métodos exegéticos e desenvolvimento doutrinário.' },
                     { id: 'avancado', title: 'Avançado', desc: 'Epistemologia religiosa, teologia sistemática e controvérsias contemporâneas.' },
                   ].map((item) => {
@@ -651,16 +609,9 @@ export default function App() {
                         }`}
                       >
                         <div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">
-                              {count > 0 ? `${count} Aulas Indexadas` : 'Aguardando Indexação'}
-                            </span>
-                            {!currentUser && (
-                              <span className="px-2 py-0.5 rounded-full text-[9px] bg-white/[0.05] text-zinc-400 border border-white/[0.08] flex items-center gap-1">
-                                <Lock className="w-2.5 h-2.5" /> Requer Login
-                              </span>
-                            )}
-                          </div>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">
+                            {count > 0 ? `${count} Aulas Indexadas` : 'Aguardando Indexação'}
+                          </span>
                           <h3 className="text-lg font-bold text-white mt-1.5 group-hover:text-amber-300 transition-colors">
                             Curso {item.title}
                           </h3>
@@ -670,9 +621,7 @@ export default function App() {
                         </div>
 
                         <div className="mt-6 flex items-center justify-between pt-4 border-t border-white/[0.04]">
-                          <span className="text-xs text-zinc-500 font-medium">
-                            {currentUser ? 'Aceder à grade de aulas' : 'Entrar para aceder'}
-                          </span>
+                          <span className="text-xs text-zinc-500 font-medium">Acessar grade de aulas</span>
                           <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
                         </div>
                       </div>
@@ -684,7 +633,7 @@ export default function App() {
           </main>
         )}
 
-        {/* VISTA 2: AULAS */}
+        {/* VISTA 2: AULAS NA SEQUÊNCIA EXATA DO TELEGRAM */}
         {currentView === 'aulas' && (
           !currentUser ? (
             <SimpleLoginScreen 
@@ -697,11 +646,11 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.06]">
                   <div>
                     <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                      <FolderTree className="w-5 h-5 text-amber-400" />
-                      Grade de Aulas • Nível {(selectedLevel || 'basico').toUpperCase()}
+                      <Layers className="w-5 h-5 text-amber-400" />
+                      Grade de Aulas ({selectedLevel.toUpperCase()})
                     </h1>
                     <p className="text-xs text-zinc-400 mt-1">
-                      {currentLevelLessons.length} aulas organizadas por disciplinas teológicas
+                      {filteredLessons.length} aulas na sequência exata do Telegram
                     </p>
                   </div>
 
@@ -709,7 +658,7 @@ export default function App() {
                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500" />
                     <input
                       type="text"
-                      placeholder="Pesquisar lição ou tema..."
+                      placeholder="Pesquisar por título ou texto..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-amber-400/40 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
@@ -717,116 +666,63 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {Object.keys(groupedModules).length > 0 ? (
-                    Object.entries(groupedModules).map(([moduleName, moduleLessons]) => {
-                      const isOpen = expandedModules[moduleName] !== false;
-                      const completedInMod = moduleLessons.filter(l => completedLessons.includes(getLessonKey(l))).length;
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] divide-y divide-white/[0.04] overflow-hidden">
+                  {filteredLessons.map((lesson) => {
+                    const key = getLessonKey(lesson);
+                    const isDone = completedLessons.includes(key);
+                    const progress = playbackProgress[key];
 
-                      return (
-                        <div 
-                          key={moduleName} 
-                          className="rounded-2xl border border-white/[0.06] bg-white/[0.01] overflow-hidden"
-                        >
-                          <div 
-                            onClick={() => {
-                              setExpandedModules((prev) => ({
-                                ...prev,
-                                [moduleName]: !isOpen
-                              }));
+                    return (
+                      <div
+                        key={lesson.telegram_msg_id}
+                        onClick={() => startLesson(lesson)}
+                        className="p-3.5 sm:p-4 hover:bg-white/[0.04] cursor-pointer group transition-all flex items-center justify-between gap-4"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleComplete(lesson);
                             }}
-                            className="p-4 bg-white/[0.02] hover:bg-white/[0.04] flex items-center justify-between cursor-pointer transition-colors"
+                            className="text-zinc-500 hover:text-amber-400 cursor-pointer"
                           >
-                            <div className="flex items-center gap-3">
-                              <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
-                              <div>
-                                <h3 className="text-sm font-semibold text-white tracking-wide">
-                                  {moduleName}
-                                </h3>
-                                <span className="text-[11px] text-zinc-400">
-                                  {moduleLessons.length} lições • {completedInMod} concluídas
-                                </span>
-                              </div>
-                            </div>
+                            {isDone ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full border border-zinc-600 hover:border-zinc-400" />
+                            )}
+                          </button>
 
-                            <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                              <div 
-                                className="bg-amber-400 h-full rounded-full transition-all"
-                                style={{ width: `${moduleLessons.length ? (completedInMod / moduleLessons.length) * 100 : 0}%` }}
-                              />
-                            </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-mono text-zinc-500">
+                              Aula {lesson.id.toString().padStart(3, '0')}
+                            </span>
+                            <h4 className="text-xs md:text-sm font-medium text-zinc-200 group-hover:text-amber-300 transition-colors truncate">
+                              {lesson.title}
+                            </h4>
+                            {progress && progress.percentage > 0 && progress.percentage < 90 && (
+                              <span className="text-[10px] text-amber-400/90 font-mono">
+                                Parou em {Math.floor(progress.currentTime / 60)}:{(progress.currentTime % 60).toString().padStart(2, '0')} ({progress.percentage}%)
+                              </span>
+                            )}
                           </div>
-
-                          {isOpen && (
-                            <div className="divide-y divide-white/[0.04] px-2 py-1">
-                              {moduleLessons
-                                .filter(l => l.title.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .map((lesson) => {
-                                  const key = getLessonKey(lesson);
-                                  const isDone = completedLessons.includes(key);
-                                  const progress = playbackProgress[key];
-
-                                  return (
-                                    <div
-                                      key={lesson.id}
-                                      onClick={() => startLesson(lesson)}
-                                      className="p-3 rounded-xl flex items-center justify-between gap-4 hover:bg-white/[0.04] cursor-pointer group transition-all"
-                                    >
-                                      <div className="flex items-center gap-3.5 min-w-0">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleComplete(lesson);
-                                          }}
-                                          className="text-zinc-500 hover:text-amber-400 cursor-pointer"
-                                        >
-                                          {isDone ? (
-                                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                                          ) : (
-                                            <div className="w-5 h-5 rounded-full border border-zinc-600 hover:border-zinc-400" />
-                                          )}
-                                        </button>
-
-                                        <div className="min-w-0">
-                                          <span className="text-[10px] font-mono text-zinc-500">
-                                            Aula {lesson.id.toString().padStart(3, '0')}
-                                          </span>
-                                          <h4 className="text-xs md:text-sm font-medium text-zinc-200 group-hover:text-amber-300 transition-colors truncate">
-                                            {lesson.title}
-                                          </h4>
-                                          {progress && progress.percentage > 0 && progress.percentage < 90 && (
-                                            <span className="text-[10px] text-amber-400/90 font-mono">
-                                              Parou em {Math.floor(progress.currentTime / 60)}:{(progress.currentTime % 60).toString().padStart(2, '0')} ({progress.percentage}%)
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      <div className="flex items-center gap-3 shrink-0 text-xs text-zinc-500 font-mono">
-                                        <span>{lesson.duration_formatted}</span>
-                                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div className="p-12 text-center text-xs text-zinc-500 bg-white/[0.01] rounded-2xl border border-white/[0.05]">
-                      Nenhuma lição encontrada para o nível <strong>{selectedLevel}</strong>.
-                    </div>
-                  )}
+
+                        <div className="flex items-center gap-3 shrink-0 text-xs text-zinc-500 font-mono">
+                          <span>{lesson.duration_formatted}</span>
+                          <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </main>
           )
         )}
 
-        {/* VISTA 3: PLAYER */}
+        {/* VISTA 3: PLAYER COM BOTÕES DE PRÓXIMA / ANTERIOR (SEM IA) */}
         {currentView === 'player' && (
           !currentUser || !activeLesson ? (
             <SimpleLoginScreen 
@@ -837,6 +733,7 @@ export default function App() {
             <main className="flex-1 overflow-y-auto p-6 lg:p-8 w-full">
               <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
                 
+                {/* Reprodutor de Vídeo */}
                 <div className="relative group rounded-3xl overflow-hidden border border-white/[0.1] bg-black shadow-[0_20px_70px_-15px_rgba(0,0,0,0.8)] backdrop-blur-xl">
                   <video
                     ref={videoRef}
@@ -851,11 +748,12 @@ export default function App() {
                   />
                 </div>
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] backdrop-blur-md">
+                {/* Barra de Metadados e Controles */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/[0.05] backdrop-blur-md">
                   <div className="flex-1">
                     <div className="flex items-center gap-2.5 mb-1.5">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {activeLesson.level || 'basico'} • Aula {activeLesson.id.toString().padStart(2, '0')}
+                        {activeLesson.level || 'basico'} • Aula {activeLesson.id.toString().padStart(3, '0')}
                       </span>
                       <span className="text-xs text-zinc-400 flex items-center gap-1 font-medium">
                         <Clock className="w-3 h-3" />
@@ -871,7 +769,8 @@ export default function App() {
                     </h1>
                   </div>
 
-                  <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                    {/* Velocidades */}
                     <div className="flex items-center bg-white/[0.05] border border-white/[0.08] p-1 rounded-xl">
                       {[1, 1.25, 1.5, 2].map((speed) => (
                         <button
@@ -888,6 +787,7 @@ export default function App() {
                       ))}
                     </div>
 
+                    {/* Marcar Concluída */}
                     <button
                       onClick={() => toggleComplete(activeLesson)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
@@ -899,108 +799,73 @@ export default function App() {
                       <CheckCircle2 className={`w-4 h-4 ${completedLessons.includes(getLessonKey(activeLesson)) ? 'text-emerald-400' : 'text-zinc-400'}`} />
                       {completedLessons.includes(getLessonKey(activeLesson)) ? 'Concluída (+50 XP)' : 'Marcar Concluída'}
                     </button>
-                  </div>
-                </div>
 
-                {/* Guia com IA */}
-                <div className="p-6 md:p-8 rounded-3xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md flex flex-col gap-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/[0.06]">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-amber-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-semibold text-zinc-200 tracking-wider uppercase">
-                          Guia Teológico de Estudo
-                        </h3>
-                        <p className="text-[11px] text-zinc-500">
-                          Síntese conceptual, bases históricas e referências
-                        </p>
-                      </div>
-                    </div>
-
+                    {/* Caderno de Anotações */}
                     <button
-                      onClick={handleGenerateAiSummary}
-                      disabled={isGeneratingSummary}
-                      className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-gradient-to-r from-amber-500/20 via-amber-400/20 to-amber-300/10 hover:from-amber-500/30 hover:to-amber-300/20 border border-amber-400/30 text-amber-300 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                      onClick={() => setShowNotesDrawer(!showNotesDrawer)}
+                      className="p-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-zinc-200 border border-white/[0.08] cursor-pointer"
+                      title="Abrir Anotações"
                     >
-                      <Sparkles className={`w-3.5 h-3.5 ${isGeneratingSummary ? 'animate-spin' : ''}`} />
-                      {isGeneratingSummary ? 'A consultar fundamentos...' : aiSummary ? 'Regenerar (+20 XP)' : 'Gerar Guia com IA (+20 XP)'}
+                      <PenLine className="w-4 h-4 text-amber-400" />
                     </button>
                   </div>
-
-                  {activeLesson.description && (
-                    <div className="px-4 py-3 rounded-2xl bg-white/[0.02] border border-white/[0.04] text-xs text-zinc-400 font-mono">
-                      <span className="text-[10px] uppercase text-zinc-500 block mb-1 font-sans font-semibold">Tópico Original:</span>
-                      {activeLesson.description}
-                    </div>
-                  )}
-
-                  {summaryError && (
-                    <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
-                      {summaryError}
-                    </div>
-                  )}
-
-                  {aiSummary ? (
-                    <div className="pt-2">
-                      <ReactMarkdown
-                        components={{
-                          h2: ({ children }) => (
-                            <div className="mt-8 mb-4 flex items-center gap-2.5">
-                              <span className="w-1.5 h-5 bg-amber-400 rounded-full inline-block" />
-                              <h2 className="text-base md:text-lg font-semibold text-white tracking-tight m-0">
-                                {children}
-                              </h2>
-                            </div>
-                          ),
-                          p: ({ children }) => (
-                            <p className="text-xs md:text-sm leading-relaxed text-zinc-300 mb-4 font-light">
-                              {children}
-                            </p>
-                          ),
-                          li: ({ children }) => (
-                            <li className="flex items-start gap-3 text-xs md:text-sm text-zinc-300 leading-relaxed bg-white/[0.02] p-3.5 rounded-2xl border border-white/[0.04] mb-2.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0" />
-                              <div className="flex-1">{children}</div>
-                            </li>
-                          ),
-                          strong: ({ children }) => (
-                            <strong className="font-semibold text-white">{children}</strong>
-                          ),
-                          em: ({ children }) => (
-                            <em className="text-amber-200/90 not-italic font-medium">{children}</em>
-                          ),
-                        }}
-                      >
-                        {aiSummary}
-                      </ReactMarkdown>
-                    </div>
-                  ) : !isGeneratingSummary ? (
-                    <div className="py-12 flex flex-col items-center justify-center text-center text-zinc-500 gap-2.5">
-                      <BookOpenCheck className="w-8 h-8 text-zinc-600 stroke-[1.5]" />
-                      <p className="text-xs max-w-sm leading-relaxed">
-                        Clica em <span className="text-amber-400 font-medium">"Gerar Guia com IA"</span> para obter a análise exegética e o resumo estruturado desta aula.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="py-12 flex flex-col items-center justify-center text-center gap-3">
-                      <div className="w-6 h-6 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
-                      <p className="text-xs text-zinc-400 animate-pulse">
-                        A construir o sumário teológico...
-                      </p>
-                    </div>
-                  )}
                 </div>
+
+                {/* BARRA DE NAVEGAÇÃO: AULA ANTERIOR / PRÓXIMA AULA */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    onClick={handlePreviousLesson}
+                    disabled={!hasPrevious}
+                    className="p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] disabled:opacity-30 disabled:pointer-events-none border border-white/[0.06] flex items-center gap-3 transition-all cursor-pointer text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.05] group-hover:bg-amber-400/20 flex items-center justify-center shrink-0 transition-colors">
+                      <SkipBack className="w-4 h-4 text-zinc-300 group-hover:text-amber-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-zinc-500 uppercase font-mono tracking-wider block">Aula Anterior</span>
+                      <span className="text-xs font-semibold text-zinc-200 group-hover:text-amber-300 truncate block">
+                        {hasPrevious ? currentLevelLessons[currentIndex - 1].title : 'Início do Curso'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={handleNextLesson}
+                    disabled={!hasNext}
+                    className="p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] disabled:opacity-30 disabled:pointer-events-none border border-white/[0.06] flex items-center justify-between gap-3 transition-all cursor-pointer text-right group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] text-zinc-500 uppercase font-mono tracking-wider block">Próxima Aula</span>
+                      <span className="text-xs font-semibold text-zinc-200 group-hover:text-amber-300 truncate block">
+                        {hasNext ? currentLevelLessons[currentIndex + 1].title : 'Fim do Curso'}
+                      </span>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-white/[0.05] group-hover:bg-amber-400/20 flex items-center justify-center shrink-0 transition-colors">
+                      <SkipForward className="w-4 h-4 text-zinc-300 group-hover:text-amber-400" />
+                    </div>
+                  </button>
+                </div>
+
+                {/* Legenda Original Completa da Postagem */}
+                {activeLesson.description && (
+                  <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block mb-2">
+                      Informações da Lição (Telegram)
+                    </span>
+                    <p className="text-xs leading-relaxed text-zinc-300 whitespace-pre-line font-light">
+                      {activeLesson.description}
+                    </p>
+                  </div>
+                )}
 
               </div>
             </main>
           )
         )}
 
-        {/* 4. Modal de Troféus */}
+        {/* Modal de Conquistas */}
         {showTrophyModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-xl">
             <div 
               className="w-full max-w-2xl max-h-[85vh] bg-[#0c1017] border border-white/[0.1] rounded-3xl flex flex-col shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
@@ -1015,7 +880,7 @@ export default function App() {
                       {currentRank.title}
                     </h2>
                     <p className="text-xs text-zinc-400">
-                      Nível {currentRank.level} • {userXp} Pontos de Experiência (XP)
+                      Nível {currentRank.level} • {userXp} XP
                     </p>
                   </div>
                 </div>
@@ -1046,7 +911,7 @@ export default function App() {
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-2">
                     <Award className="w-4 h-4 text-amber-400" />
-                    Conquistas & Troféus Desbloqueados
+                    Troféus Desbloqueados
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1071,9 +936,6 @@ export default function App() {
                             <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
                               {ach.description}
                             </p>
-                            <span className="text-[9px] font-mono mt-1 block text-zinc-500">
-                              {isUnlocked ? '✓ Desbloqueado' : '🔒 Bloqueado'}
-                            </span>
                           </div>
                         </div>
                       );
@@ -1084,6 +946,36 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* 4. Caderno de Anotações */}
+        {showNotesDrawer && activeLesson && (
+          <aside className="w-96 border-l border-white/[0.08] bg-black/60 backdrop-blur-2xl p-6 flex flex-col z-20">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-4">
+              <div className="flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-semibold text-white">Caderno de Estudos</h3>
+              </div>
+              <button 
+                onClick={() => setShowNotesDrawer(false)}
+                className="w-7 h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 flex flex-col">
+              <label className="text-[11px] font-medium text-zinc-400 mb-2">
+                Notas da Aula {activeLesson.id}
+              </label>
+              <textarea
+                value={currentNote}
+                onChange={(e) => handleNoteChange(e.target.value)}
+                placeholder="Escreva suas anotações aqui..."
+                className="w-full flex-1 bg-white/[0.03] focus:bg-white/[0.06] border border-white/[0.08] focus:border-amber-400/40 rounded-2xl p-4 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none leading-relaxed transition-all"
+              />
+            </div>
+          </aside>
         )}
 
       </div>
