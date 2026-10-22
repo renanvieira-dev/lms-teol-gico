@@ -1,83 +1,81 @@
 import json
 import re
+from pathlib import Path
 
-CATALOG_PATH = "catalogo_aulas.json"
+catalog_path = Path(__file__).parent / "catalogo_aulas.json"
 
-def clean_lesson_title(raw_title: str) -> str:
-    """Remove IDs como #F203, hashtags e IDs do YouTube do final (-MtG67ogpgYQ)."""
-    title = raw_title.strip()
+if not catalog_path.exists():
+    print("[!] catalogo_aulas.json não encontrado.")
+    exit(1)
+
+with open(catalog_path, "r", encoding="utf-8") as f:
+    lessons = json.load(f)
+
+print(f"[*] Processando {len(lessons)} aulas...")
+
+initial_block = []  # Aulas F001 até F024
+remaining_block = []  # F025 em diante
+
+for lesson in lessons:
+    raw = lesson.get("description", "") or lesson.get("title", "")
+    line = raw.strip().split("\n")[0]
     
-    # Remove prefixos como #F203, #01, #F001
-    title = re.sub(r"^#[A-Za-z0-9_-]+\s*", "", title)
-    
-    # Remove sufixos com ID do YouTube (ex: -MtG67ogpgYQ ou _wgBaqd-D6c no final)
-    title = re.sub(r"-[A-Za-z0-9_-]{10,12}$", "", title)
-    
-    # Substitui underlines soltos por hífens limpos
-    title = title.replace(" _ ", " - ").strip()
-    return title
+    # Verifica se pertence ao grupo F001 a F024
+    f_match = re.search(r"^#?F(\d+)", line, re.IGNORECASE)
+    f_num = int(f_match.group(1)) if f_match else None
 
-def extract_module(raw_title: str, description: str) -> tuple[str, str]:
-    """Identifica a disciplina teológica real a partir da legenda e do título."""
-    caption_lines = [l.strip() for l in (description or "").split("\n") if l.strip()]
-    first_caption = caption_lines[0] if caption_lines else ""
+    # Extrai o número da aula no final (ex: "aula 22", "Aula 05")
+    aula_match = re.search(r"[Aa]ula\s*(\d+)", line)
+    lesson_num = int(aula_match.group(1)) if aula_match else 0
 
-    module = None
+    # Limpeza de título e hash do YouTube (-iZx2Um8O-hE)
+    clean_line = re.sub(r"^#?F\d+\s+", "", line)
+    clean_line = re.sub(r"-[A-Za-z0-9_-]{8,}.*$", "", clean_line).strip()
+    clean_line = re.sub(r"-?\s*[Aa]ula\s*\d+.*$", "", clean_line).strip()
 
-    # 1. Padrão claro na legenda: "14 - Patristica", "12 - Grego Biblico", "01 - Teologia"
-    match_legend = re.match(r"^\d+\s*[-–]\s*(.+)$", first_caption)
-    if match_legend:
-        module = match_legend.group(1).strip()
-    elif first_caption and len(first_caption) <= 45 and not first_caption.startswith("http"):
-        module = first_caption
+    parts = [p.strip() for p in clean_line.split("-") if len(p.strip()) > 1]
 
-    # 2. Se a legenda não tinha módulo, tenta extrair do título (ex: "Catolicismo - Ciência Na Religião")
-    if not module and " - " in raw_title:
-        parts = raw_title.split(" - ")
-        if len(parts) >= 2:
-            module = parts[1].split(".")[0].strip()
-
-    # Fallback se realmente não houver disciplina
-    if not module or module.lower() in ["geral", "video", "aula"]:
-        module = "Fundamentos Gerais"
-
-    # Remove códigos remanescentes do nome do módulo
-    module = re.sub(r"^#[A-Za-z0-9_-]+\s*", "", module).strip()
-    module = module.title() # Capitalização elegante (ex: Patrística, Grego Bíblico)
-
-    clean_title = clean_lesson_title(raw_title)
-    return module, clean_title
-
-def main():
-    try:
-        with open(CATALOG_PATH, "r", encoding="utf-8") as f:
-            lessons = json.load(f)
-    except FileNotFoundError:
-        print("Arquivo catalogo_aulas.json não encontrado!")
-        return
-
-    print(f"Processando {len(lessons)} aulas...")
-    modules_count = {}
-
-    for item in lessons:
-        raw_t = item.get("raw_title") or item.get("title") or ""
-        desc = item.get("description") or ""
-
-        mod, clean_t = extract_module(raw_t, desc)
+    if f_num is not None and 1 <= f_num <= 24:
+        # Bloco F1 a F24: Introdução aos Estudos Teológicos
+        # Estrutura: [Tema] - Introdução aos Estudos Teológicos
+        title = parts[0] if len(parts) > 0 else f"Aula {lesson_num:02d}"
+        module = "Introdução aos Estudos Teológicos"
         
-        item["module"] = mod
-        item["title"] = clean_t
-        item["raw_title"] = raw_t
+        lesson["title"] = title
+        lesson["module"] = module
+        lesson["real_lesson_num"] = lesson_num if lesson_num > 0 else f_num
+        initial_block.append(lesson)
+    else:
+        # A partir do F025: mantém a ordem natural do Telegram
+        if len(parts) >= 2:
+            module = parts[1].strip()
+            title = parts[0].strip()
+        elif len(parts) == 1:
+            module = "Módulo Geral"
+            title = parts[0].strip()
+        else:
+            module = "Módulo Geral"
+            title = lesson.get("title", f"Aula {lesson.get('id', 0)}")
 
-        modules_count[mod] = modules_count.get(mod, 0) + 1
+        lesson["title"] = title
+        lesson["module"] = module
+        remaining_block.append(lesson)
 
-    with open(CATALOG_PATH, "w", encoding="utf-8") as f:
-        json.dump(lessons, f, ensure_ascii=False, indent=2)
+# 1. Ordena o bloco F1-F24 estritamente pela numeração real ("aula 01, 02... 24")
+initial_block.sort(key=lambda x: x["real_lesson_num"])
 
-    print("\n✅ Catálogo reorganizado com sucesso!")
-    print("\n--- Módulos identificados e quantidade de aulas ---")
-    for mod, count in sorted(modules_count.items(), key=lambda x: x[1], reverse=True):
-        print(f"• {mod}: {count} aulas")
+# 2. Junta os dois blocos: primeiro o bloco F1-F24 ordenado, depois o restante na sequência do Telegram
+final_list = initial_block + remaining_block
 
-if __name__ == "__main__":
-    main()
+# 3. Renumera os IDs de 1 a 521 de forma contínua
+for idx, item in enumerate(final_list, start=1):
+    item["id"] = idx
+    if "real_lesson_num" in item:
+        del item["real_lesson_num"]
+
+with open(catalog_path, "w", encoding="utf-8") as f:
+    json.dump(final_list, f, ensure_ascii=False, indent=2)
+
+print("\n[🎉] Reorganização concluída com sucesso!")
+print(f"  • {len(initial_block)} aulas do bloco F01-F24 ordenadas cronologicamente (Aula 1 a {len(initial_block)}).")
+print(f"  • {len(remaining_block)} aulas subsequentes mantidas na ordem original do canal.")
